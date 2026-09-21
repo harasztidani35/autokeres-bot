@@ -25,7 +25,7 @@ def keep_alive():
 # ==========================================
 
 # ==========================================
-# ⚙️ BEÁLLÍTÁSOK ÉS MINTÁK
+# ⚙️ BEÁLLÍTÁSOK ÉS MINTÁK (TICKETEKhEZ)
 # ==========================================
 ELADO_CHANNEL_ID = 1551543012956438609
 KERESEK_CHANNEL_ID = 1551542857129660458
@@ -38,6 +38,13 @@ Autó ár alja: xxx.xxx.xxx $"""
 MINTA_KERESEK = """Keresett autó neve: xxx.xxx.xxx
 Ajánlott keret: xxx.xxx.xxx $
 Elvárt felszereltség / tuningok: xxx"""
+
+# ==========================================
+# ⚙️ BEÁLLÍTÁSOK (RANGOK ÉS SZABÁLYZAT)
+# ==========================================
+UJONC_ROLE_ID = 1551551419113541692
+TAG_ROLE_ID = 1551605958927589407
+SZABALYZAT_MESSAGE_ID = 1551604413066387619
 # ==========================================
 
 class TicketControlView(ui.View):
@@ -151,10 +158,12 @@ class TicketPanelView(ui.View):
         
         await ticket_channel.send(minta_szoveg, view=TicketControlView(user_id=user.id))
 
+
 class AutoKeresBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
+        intents.members = True # <--- FONTOS: Ez engedélyezi, hogy lássa az új belépőket!
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
@@ -167,6 +176,37 @@ bot = AutoKeresBot()
 async def on_ready():
     print(f"✅ Bot sikeresen elindult mint: {bot.user}")
 
+# --- RANGADÓ RENDSZER ---
+@bot.event
+async def on_member_join(member):
+    """Amikor valaki belép a szerverre, megkapja az Újonc rangot."""
+    ujonc_role = member.guild.get_role(UJONC_ROLE_ID)
+    if ujonc_role:
+        await member.add_roles(ujonc_role)
+        print(f"✅ {member.name} megkapta az Újonc rangot!")
+
+@bot.event
+async def on_raw_reaction_add(payload):
+    """Amikor valaki reagál a szabályzat üzenetre."""
+    if payload.message_id == SZABALYZAT_MESSAGE_ID:
+        if str(payload.emoji) == "✅":  # Ha a pipa emojit nyomja meg
+            guild = bot.get_guild(payload.guild_id)
+            member = guild.get_member(payload.user_id)
+            
+            if member and not member.bot:
+                tag_role = guild.get_role(TAG_ROLE_ID)
+                ujonc_role = guild.get_role(UJONC_ROLE_ID)
+                
+                # Ráadjuk a Tag rangot
+                if tag_role:
+                    await member.add_roles(tag_role)
+                # Levesszük az Újonc rangot
+                if ujonc_role:
+                    await member.remove_roles(ujonc_role)
+                
+                print(f"✅ {member.name} elfogadta a szabályzatot!")
+
+# --- PARANCSOK ---
 @bot.tree.command(name="panel", description="Hirdetésfeladó ticket panel kiküldése")
 @app_commands.checks.has_permissions(administrator=True)
 async def send_panel(interaction: discord.Interaction):
@@ -178,6 +218,7 @@ async def send_panel(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=TicketPanelView())
     await interaction.response.send_message("Panel kiküldve!", ephemeral=True)
 
+
 if __name__ == "__main__":
-    keep_alive()  # Elindítja a háttérben a web szervert
+    keep_alive()
     bot.run(os.getenv("TOKEN"))
