@@ -197,6 +197,9 @@ class HelpTicketPanelView(ui.View):
 
     @ui.button(label="📩 Segítségkérés (Ticket Nyitása)", style=discord.ButtonStyle.primary, custom_id="btn_open_help_ticket")
     async def open_help_ticket(self, interaction: discord.Interaction, button: ui.Button):
+        # ELŐRE JELEZZÜK A DISCORDNAK, HOGY FOLYAMATBAN VAN (Megelőzi az időtúllépési hibát)
+        await interaction.response.defer(ephemeral=True)
+
         guild = interaction.guild
         user = interaction.user
         
@@ -222,10 +225,10 @@ class HelpTicketPanelView(ui.View):
                 reason="Segítségkérő ticket nyitása"
             )
         except Exception as e:
-            await interaction.response.send_message("❌ Nem sikerült létrehozni a szobát. Biztos van a botnak Csatornák Kezelése joga?", ephemeral=True)
+            await interaction.followup.send("❌ Nem sikerült létrehozni a szobát. Biztos van a botnak Csatornák Kezelése joga?", ephemeral=True)
             return
 
-        await interaction.response.send_message(f"✅ Segítségkérő ticket megnyitva itt: {ticket_channel.mention}", ephemeral=True)
+        await interaction.followup.send(f"✅ Segítségkérő ticket megnyitva itt: {ticket_channel.mention}", ephemeral=True)
         
         embed = discord.Embed(
             title="🛠️ Segítségkérés",
