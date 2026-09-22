@@ -33,7 +33,7 @@ TICKET_CATEGORY_ID = 0
 
 MINTA_ELADO = """Autó neve: xxx.xxx.xxx
 Autó irányára: xxx.xxx.xxx $
-Autó ár alja: xxx.xxx.xxx $"""l
+Autó ár alja: xxx.xxx.xxx $"""
 
 MINTA_KERESEK = """Keresett autó neve: xxx.xxx.xxx
 Ajánlott keret: xxx.xxx.xxx $
