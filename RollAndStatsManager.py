@@ -25,7 +25,7 @@ def keep_alive():
 # ==========================================
 
 # ==========================================
-# ⚙️ BEÁLLÍTÁSOK ÉS MINTÁK (TICKETEKhEZ)
+# ⚙️ BEÁLLÍTÁSOK ÉS MINTÁK (AUTÓKER TICKETEKhEZ)
 # ==========================================
 ELADO_CHANNEL_ID = 1551543012956438609
 KERESEK_CHANNEL_ID = 1551542857129660458
@@ -40,6 +40,13 @@ Ajánlott keret: xxx.xxx.xxx $
 Elvárt felszereltség / tuningok: xxx"""
 
 # ==========================================
+# ⚙️ ÚJ: BEÁLLÍTÁSOK (SEGÍTSÉGKÉRŐ TICKET)
+# ==========================================
+# Cseréld ki a 0-kat a megfelelő ID-kre!
+HELP_TICKET_CATEGORY_ID = 0  # Ide nyílnak majd a segítség ticketek
+MODERATOR_ROLE_ID = 0        # Aki ezt a rangot viseli, az látja a segítség ticketeket és le tudja zárni
+
+# ==========================================
 # ⚙️ BEÁLLÍTÁSOK (RANGOK ÉS SZABÁLYZAT)
 # ==========================================
 UJONC_ROLE_ID = 1551551419113541692
@@ -47,6 +54,9 @@ TAG_ROLE_ID = 1551605958927589407
 SZABALYZAT_MESSAGE_ID = 1551604413066387619
 # ==========================================
 
+# -----------------------------------------------------
+# AUTÓKERESKEDÉS TICKET RENDSZER (EREDETI)
+# -----------------------------------------------------
 class TicketControlView(ui.View):
     def __init__(self, user_id: int):
         super().__init__(timeout=None)
@@ -158,6 +168,77 @@ class TicketPanelView(ui.View):
         
         await ticket_channel.send(minta_szoveg, view=TicketControlView(user_id=user.id))
 
+# -----------------------------------------------------
+# ÚJ: SEGÍTSÉGKÉRŐ TICKET RENDSZER
+# -----------------------------------------------------
+class HelpTicketControlView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @ui.button(label="🔒 Ticket Lezárása", style=discord.ButtonStyle.danger, custom_id="btn_close_help_ticket")
+    async def close_help_ticket(self, interaction: discord.Interaction, button: ui.Button):
+        # Csak az zárhatja be, aki moderátor, vagy akinek van csatornakezelési joga
+        moderator_role = interaction.guild.get_role(MODERATOR_ROLE_ID)
+        is_mod = (moderator_role in interaction.user.roles) if moderator_role else False
+        has_perms = interaction.user.guild_permissions.manage_channels
+
+        if not (is_mod or has_perms):
+            await interaction.response.send_message("❌ Ezt a gombot csak a vezetőség használhatja!", ephemeral=True)
+            return
+
+        await interaction.response.send_message("✅ A ticket lezárásra került. A szoba 5 másodperc múlva törlődik...")
+        await asyncio.sleep(5)
+        await interaction.channel.delete(reason="Segítségkérő ticket lezárva a moderátor által")
+
+
+class HelpTicketPanelView(ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @ui.button(label="📩 Segítségkérés (Ticket Nyitása)", style=discord.ButtonStyle.primary, custom_id="btn_open_help_ticket")
+    async def open_help_ticket(self, interaction: discord.Interaction, button: ui.Button):
+        guild = interaction.guild
+        user = interaction.user
+        
+        # Alap jogosultságok: mindenki elől elrejtve, a nyitónak és a botnak látható
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True, read_message_history=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True, manage_channels=True)
+        }
+
+        # Ha be van állítva moderátor rang, ők is látni fogják
+        moderator_role = guild.get_role(MODERATOR_ROLE_ID)
+        if moderator_role:
+            overwrites[moderator_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True, read_message_history=True)
+
+        category = guild.get_channel(HELP_TICKET_CATEGORY_ID) if HELP_TICKET_CATEGORY_ID != 0 else interaction.channel.category
+        
+        try:
+            ticket_channel = await guild.create_text_channel(
+                name=f"ticket-{user.name}",
+                category=category,
+                overwrites=overwrites,
+                reason="Segítségkérő ticket nyitása"
+            )
+        except Exception as e:
+            await interaction.response.send_message("❌ Nem sikerült létrehozni a szobát. Biztos van a botnak Csatornák Kezelése joga?", ephemeral=True)
+            return
+
+        await interaction.response.send_message(f"✅ Segítségkérő ticket megnyitva itt: {ticket_channel.mention}", ephemeral=True)
+        
+        embed = discord.Embed(
+            title="🛠️ Segítségkérés",
+            description=(
+                f"Üdvözöllek {user.mention}!\n\n"
+                "Kérlek, írd le ide részletesen a problémádat vagy kérdésedet. A vezetőség (moderátorok/tulajdonosok) amint tudnak, válaszolni fognak neked ebben a szobában.\n\n"
+                "*(Ezt a szobát csak te és a vezetőség látja. Amikor a probléma megoldódott, a vezetőség fogja lezárni a lenti gombbal.)*"
+            ),
+            color=discord.Color.blue()
+        )
+        
+        await ticket_channel.send(content=f"{user.mention}", embed=embed, view=HelpTicketControlView())
+
 
 class AutoKeresBot(commands.Bot):
     def __init__(self):
@@ -167,7 +248,10 @@ class AutoKeresBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
+        # Itt regisztráljuk be a gombokat, hogy újraindítás után is működjenek
         self.add_view(TicketPanelView())
+        self.add_view(HelpTicketPanelView())
+        self.add_view(HelpTicketControlView())
         await self.tree.sync()
 
 bot = AutoKeresBot()
@@ -207,6 +291,8 @@ async def on_raw_reaction_add(payload):
                 print(f"✅ {member.name} elfogadta a szabályzatot!")
 
 # --- PARANCSOK ---
+
+# Eredeti Autóker panel parancs
 @bot.tree.command(name="panel", description="Hirdetésfeladó ticket panel kiküldése")
 @app_commands.checks.has_permissions(administrator=True)
 async def send_panel(interaction: discord.Interaction):
@@ -216,7 +302,19 @@ async def send_panel(interaction: discord.Interaction):
         color=discord.Color.gold()
     )
     await interaction.channel.send(embed=embed, view=TicketPanelView())
-    await interaction.response.send_message("Panel kiküldve!", ephemeral=True)
+    await interaction.response.send_message("Autóker panel kiküldve!", ephemeral=True)
+
+# ÚJ: Segítségkérő panel parancs
+@bot.tree.command(name="segitseg_panel", description="Segítségkérő ticket panel kiküldése")
+@app_commands.checks.has_permissions(administrator=True)
+async def send_help_panel(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="📩 Segítségkérés",
+        description="Ha kérdésed van, elakadtál, vagy adminisztrátori segítségre van szükséged, kattints az alábbi gombra!\n\nEz létrehoz számodra egy privát szobát, amit csak te és a vezetőség lát, így nyugodtan leírhatod a problémádat.",
+        color=discord.Color.blue()
+    )
+    await interaction.channel.send(embed=embed, view=HelpTicketPanelView())
+    await interaction.response.send_message("Segítségkérő panel kiküldve!", ephemeral=True)
 
 
 if __name__ == "__main__":
