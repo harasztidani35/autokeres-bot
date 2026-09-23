@@ -5,7 +5,7 @@ import io
 import asyncio
 import os
 from flask import Flask
-from threading import Thread
+from threading import Threadh
 
 # ==========================================
 # ⚙️ MINI WEB SZERVER AZ ÉBREN TARTÁSHOZ
