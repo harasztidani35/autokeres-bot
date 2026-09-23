@@ -33,11 +33,13 @@ TICKET_CATEGORY_ID = 0
 
 MINTA_ELADO = """Autó neve: xxx.xxx.xxx
 Autó irányára: xxx.xxx.xxx $
-Autó ár alja: xxx.xxx.xxx $"""
+Autó ár alja: xxx.xxx.xxx $
+Telefonszám:"""
 
 MINTA_KERESEK = """Keresett autó neve: xxx.xxx.xxx
 Ajánlott keret: xxx.xxx.xxx $
-Elvárt felszereltség / tuningok: xxx"""
+Elvárt felszereltség / tuningok: xxx
+Telefonszám:"""
 
 # ==========================================
 # ⚙️ ÚJ: BEÁLLÍTÁSOK (SEGÍTSÉGKÉRŐ TICKET)
